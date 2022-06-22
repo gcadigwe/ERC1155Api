@@ -1,0 +1,25 @@
+type Token @entity {
+  id: ID!
+  tokenID: BigInt!
+  tokenURI: String!
+  name: String!
+  image: String!
+  description: String!
+  updatedAtTimeStamp: BigInt!
+  owner: User!
+}
+
+type User @entity {
+  id: ID!
+  tokens: [Token!]! @derivedFrom(field: "owner")
+}
+
+# type _Schema_
+#   @fulltext(
+#     name: "covenSearch"
+#     language: en
+#     algorithm: rank
+#     include: [
+#       { entity: "Token", fields: [{ name: "name" }, { name: "description" }] }
+#     ]
+#   )

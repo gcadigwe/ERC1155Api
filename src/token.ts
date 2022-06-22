@@ -1,71 +1,86 @@
-import { BigInt } from "@graphprotocol/graph-ts"
-import {
-  Token,
-  ApprovalForAll,
-  OwnershipTransferred,
-  TransferBatch,
-  TransferSingle,
-  URI
-} from "../generated/Token/Token"
-import { ExampleEntity } from "../generated/schema"
+import { BigInt, ipfs, json } from "@graphprotocol/graph-ts";
+import { TransferBatch, TransferSingle } from "../generated/Token/Token";
+import { User, Token } from "../generated/schema";
 
-export function handleApprovalForAll(event: ApprovalForAll): void {
-  // Entities can be loaded from the store using a string ID; this ID
-  // needs to be unique across all entities of the same type
-  let entity = ExampleEntity.load(event.transaction.from.toHex())
+const ipfsHash = "bafybeigduncdckmak2zljhdifpvimzdhgkdunyjcssyao2ay23rsgbbixi";
 
-  // Entities only exist after they have been saved to the store;
-  // `null` checks allow to create entities on demand
-  if (!entity) {
-    entity = new ExampleEntity(event.transaction.from.toHex())
+export function handleTransferBatch(event: TransferBatch): void {
+  let batchLength = event.params.ids.length;
 
-    // Entity fields can be set using simple assignments
-    entity.count = BigInt.fromI32(0)
+  for (let i = 0; i < batchLength; i++) {
+    let token = Token.load(event.params.ids[i].toString());
+    if (!token) {
+      token = new Token(event.params.ids[i].toString());
+      token.tokenID = event.params.ids[i];
+      token.tokenURI =
+        "/" + "RigelJson/" + event.params.ids[i].toString() + ".json";
+      let metadata = ipfs.cat(ipfsHash + token.tokenURI);
+
+      if (metadata) {
+        const value = json.fromBytes(metadata).toObject();
+
+        if (value) {
+          const image = value.get("image");
+          const name = value.get("name");
+          const description = value.get("description");
+          if (name && image && description) {
+            token.image = image.toString();
+            token.name = name.toString();
+            token.description = description.toString();
+          }
+        }
+      }
+    }
+    token.updatedAtTimeStamp = event.block.timestamp;
+    token.owner = event.params.to.toHexString();
+    token.save();
+
+    let user = User.load(event.params.to.toHexString());
+    if (!user) {
+      user = new User(event.params.to.toHexString());
+      user.save();
+    }
   }
-
-  // BigInt and BigDecimal math are supported
-  entity.count = entity.count + BigInt.fromI32(1)
-
-  // Entity fields can be set based on event parameters
-  entity.account = event.params.account
-  entity.operator = event.params.operator
-
-  // Entities can be written to the store with `.save()`
-  entity.save()
-
-  // Note: If a handler doesn't require existing field values, it is faster
-  // _not_ to load the entity from the store. Instead, create it fresh with
-  // `new Entity(...)`, set the fields that should be updated and save the
-  // entity back to the store. Fields that were not set or unset remain
-  // unchanged, allowing for partial updates to be applied.
-
-  // It is also possible to access smart contracts from mappings. For
-  // example, the contract that has emitted the event can be connected to
-  // with:
-  //
-  // let contract = Contract.bind(event.address)
-  //
-  // The following functions can then be called on this contract to access
-  // state variables and other data:
-  //
-  // - contract.balanceOf(...)
-  // - contract.balanceOfBatch(...)
-  // - contract.contractURI(...)
-  // - contract.feeDenominator(...)
-  // - contract.isApprovedForAll(...)
-  // - contract.mintBatch(...)
-  // - contract.name(...)
-  // - contract.owner(...)
-  // - contract.royaltyInfo(...)
-  // - contract.setUri(...)
-  // - contract.supportsInterface(...)
-  // - contract.uri(...)
 }
 
-export function handleOwnershipTransferred(event: OwnershipTransferred): void {}
+export function handleTransferSingle(event: TransferSingle): void {
+  let token = Token.load(event.params.id.toString());
+  if (!token) {
+    token = new Token(event.params.id.toString());
+    token.tokenID = event.params.id;
+    token.tokenURI = "/" + "RigelJson/" + event.params.id.toString() + ".json";
+    let metadata = ipfs.cat(ipfsHash + token.tokenURI);
 
-export function handleTransferBatch(event: TransferBatch): void {}
+    if (metadata) {
+      const value = json.fromBytes(metadata).toObject();
 
-export function handleTransferSingle(event: TransferSingle): void {}
+      if (value) {
+        const image = value.get("image");
+        const name = value.get("name");
+        const description = value.get("description");
+        if (name && image && description) {
+          token.image = image.toString();
+          token.name = name.toString();
+          token.description = description.toString();
+        }
+      }
+    }
+  }
+  token.updatedAtTimeStamp = event.block.timestamp;
+  token.owner = event.params.to.toHexString();
+  token.save();
 
-export function handleURI(event: URI): void {}
+  let user = User.load(event.params.to.toHexString());
+  if (!user) {
+    user = new User(event.params.to.toHexString());
+    user.save();
+  }
+}
+
+// tokenID: BigInt!
+//   tokenURI: String!
+//   image: String!
+//   name: String!
+//   description: String!
+//   updatedAtTimeStamp: BigInt!
+//   owner: User!
